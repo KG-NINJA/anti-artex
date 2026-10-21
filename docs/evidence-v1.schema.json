@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:anti-artex:evidence:1.0",
+  "title": "Proposed Anti-ARTEX evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "observed_at",
+    "source_type",
+    "assessment_id",
+    "finding_type",
+    "severity",
+    "evidence",
+    "confidence",
+    "limitations",
+    "remediation",
+    "content_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "source_type": {
+      "const": "mcp_honeypot"
+    },
+    "assessment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "finding_type": {
+      "enum": [
+        "possible_prompt_injection",
+        "invalid_authentication",
+        "anomalous_sequence",
+        "malformed_request"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "low",
+        "medium"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "indicators"
+      ],
+      "properties": {
+        "indicators": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "preview": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "remediation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
