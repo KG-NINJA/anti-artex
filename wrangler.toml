@@ -1,0 +1,26 @@
+name = "anti-artex-research"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+
+# No routes, real database ID, production bindings, or automatic deployment.
+# Create a NEW isolated D1 database manually, then configure its ID locally.
+[[d1_databases]]
+binding = "DB"
+database_name = "anti-artex-research"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+RETENTION_HOURS = "24"
+MAX_EVENTS = "1000"
+MAX_SESSIONS = "100"
+MAX_BODY_BYTES = "8192"
+PREVIEW_CHARS = "0"
+DAILY_REQUEST_LIMIT = "1000"
+SESSION_TTL_SECONDS = "900"
+
+# Hourly physical expiry cleanup; reads hide expired events immediately.
+[triggers]
+crons = ["0 * * * *"]
