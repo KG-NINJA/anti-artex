@@ -1,4 +1,4 @@
-import { hash, indicators, makeEvidence, redact, type Finding, type Evidence } from './evidence.js';
+import { hash, indicators, makeEvidence, redact, type Finding } from './evidence.js';
 
 export interface Statement {
   bind(...args: unknown[]): Statement;
@@ -95,7 +95,8 @@ const worker = {
         }
         const limit = number(url.searchParams.get('limit') ?? undefined, 20, 1, 100);
         const rows = await env.DB.prepare('SELECT envelope FROM events WHERE expires_at > ? ORDER BY observed_at DESC, event_id DESC LIMIT ?').bind(at, limit).all<{ envelope: string }>();
-        return json({ events: rows.results.map(r => JSON.parse(r.envelope) as Evidence), limit });
+        // Retained pre-v2 envelopes keep their original version and hash. No implicit migration.
+        return json({ events: rows.results.map(r => JSON.parse(r.envelope) as unknown), limit });
       }
       // Browsers are not an intended client. Deny every Origin, preventing DNS-rebinding/browser access.
       if (request.headers.has('origin')) return json({ error: 'Origin forbidden' }, 403);
@@ -156,7 +157,7 @@ const worker = {
         const id = crypto.randomUUID();
         const inserted = await env.DB.prepare('INSERT INTO sessions(id, initialized, expires_at) SELECT ?, 0, ? WHERE (SELECT COUNT(*) FROM sessions) < ? RETURNING id').bind(id, new Date(Date.parse(at) + c.ttl * 1000).toISOString(), c.sessions).first();
         if (!inserted) return json({ error: 'Session capacity reached' }, 429);
-        return result({ protocolVersion: params.protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'anti-artex-simulation', version: '0.1.0' }, instructions: 'Research simulation only. All content is fictional.' }, { 'Mcp-Session-Id': id });
+        return result({ protocolVersion: params.protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'anti-artex-simulation', version: '0.2.0' }, instructions: 'Research simulation only. All content is fictional.' }, { 'Mcp-Session-Id': id });
       }
       if (!session) { await record('anomalous_sequence', ['request_before_initialize']); return error(-32000, 'Initialize a session first'); }
       if (!['2025-03-26', '2025-06-18'].includes(request.headers.get('mcp-protocol-version') ?? '')) return json({ error: 'Supported MCP-Protocol-Version required' }, 400);

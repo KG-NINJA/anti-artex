@@ -1,0 +1,20 @@
+{
+  "schema_version": "1",
+  "event_id": "2e7c197a-d281-4727-9e66-9d3a7d60ab87",
+  "observed_at": "2026-10-21T08:18:27.773Z",
+  "source_type": "submitted_mcp_metadata",
+  "assessment_id": "e0e7ca24-a245-4b2c-9ae3-2417d38545b7",
+  "finding_type": "authentication_not_declared",
+  "severity": "high",
+  "evidence": {
+    "path": "/publicConfiguration/authentication",
+    "observation": "Submitted configuration declares no authentication."
+  },
+  "confidence": "medium",
+  "limitations": [
+    "Submitted metadata only; provenance and live server behavior are not verified.",
+    "Tool annotations are untrusted hints; no tools were invoked."
+  ],
+  "remediation": "Require authenticated access and enforce per-tool authorization.",
+  "content_hash": "sha256:8e4008843aeeb0425d27e51f8536cf72c55fc1bab63f816cd6363cf95053b6c8"
+}

@@ -1,0 +1,45 @@
+{
+  "observed_at": "2026-10-21T00:00:00.000Z",
+  "assessment_id": "synthetic-assessment",
+  "honeypot": {
+    "finding": "possible_prompt_injection",
+    "flags": [
+      "instruction_override"
+    ]
+  },
+  "metadata": {
+    "capabilities": {
+      "tools": {}
+    },
+    "tools": [
+      {
+        "name": "search",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          }
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "delete_record",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        },
+        "annotations": {
+          "destructiveHint": true
+        }
+      }
+    ],
+    "publicConfiguration": {
+      "authentication": "none",
+      "transport": "https"
+    }
+  }
+}

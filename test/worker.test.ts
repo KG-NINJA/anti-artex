@@ -72,7 +72,7 @@ test('synthetic suspicious fixtures are recorded but never executed or reflected
     assert.equal(r.status, 200); assert.match(await r.text(), /No action was performed/);
   }
   const recorded = await events(env); assert.equal(recorded.length, fixtures.length);
-  for (const e of recorded) { assert.equal(e.finding_type, 'possible_prompt_injection'); assert.equal(e.evidence.preview, undefined); assert.ok(e.confidence < 1); }
+  for (const e of recorded) { assert.equal(e.finding_type, 'possible_prompt_injection'); assert.equal(e.evidence.preview, undefined); assert.ok(e.confidence.value < 1); }
   assert.equal(existsSync('/tmp/anti-artex-payload-executed'), false);
 });
 test('missing auth is recorded without capturing credentials; investigation fails closed', async () => {
@@ -131,7 +131,7 @@ test('canonical evidence is deterministic, hash validates and no actor attributi
   const second = await makeEvidence('possible_prompt_injection', ['a', 'b'], '2026-10-21T00:00:00.000Z', 'synthetic-assessment');
   assert.deepEqual(first, second);
   const { content_hash, ...base } = first;
-  assert.equal(content_hash, await hash(base));
+  assert.equal(content_hash, 'sha256:' + await hash(base));
   assert.equal(canonical({ b: 2, a: 1 }), '{"a":1,"b":2}');
   assert.match(first.limitations.join(' '), /attribution.*unknown/);
   assert.deepEqual(Object.keys(first).sort(), ['schema_version','event_id','observed_at','source_type','assessment_id','finding_type','severity','evidence','confidence','limitations','remediation','content_hash'].sort());
@@ -150,17 +150,24 @@ test('preview opt-in redacts before truncation; default privacy and configuratio
 test('shared schema and golden fixture validate; malformed envelopes fail', async () => {
   const ajv = new Ajv2020({ allErrors: true });
   formats.default(ajv);
-  const validate = ajv.compile<Evidence>(JSON.parse(readFileSync('docs/evidence-v1.schema.json', 'utf8')));
-  const golden = JSON.parse(readFileSync('fixtures/evidence-v1.json', 'utf8'));
+  const validate = ajv.compile<Evidence>(JSON.parse(readFileSync('contracts/evidence-v2.schema.json', 'utf8')));
+  const golden = JSON.parse(readFileSync('contracts/fixtures/evidence-v2.json', 'utf8'))[0];
   assert.ok(validate(golden), JSON.stringify(validate.errors));
   const actual = await makeEvidence('possible_prompt_injection', ['instruction_override'], '2026-10-21T00:00:00.000Z', 'synthetic-assessment');
   assert.deepEqual(actual, golden);
   const env = environment();
   await call(env, {}, undefined, { authorization: 'invalid' });
   for (const e of await events(env)) assert.ok(validate(e), JSON.stringify(validate.errors));
-  assert.equal(validate({ ...golden, confidence: 2 }), false);
+  assert.equal(validate({ ...golden, confidence: { scale: 'heuristic_score', value: 2 } }), false);
   assert.equal(validate({ ...golden, raw_headers: 'forbidden' }), false);
   assert.equal(validate({ ...golden, source_type: 'AI agent' }), false);
+});
+test('unexpired legacy stored envelopes remain unchanged and are never relabeled', async () => {
+  const env = environment();
+  const legacy = JSON.parse(readFileSync('fixtures/evidence-v1.json', 'utf8'));
+  env.DB.db.prepare('INSERT INTO events(event_id, observed_at, expires_at, finding_type, envelope) VALUES (?, ?, ?, ?, ?)')
+    .run(legacy.event_id, legacy.observed_at, '9999-01-01T00:00:00.000Z', legacy.finding_type, JSON.stringify(legacy));
+  assert.deepEqual(await events(env), [legacy]);
 });
 test('scheduled cleanup erases expired rows without traffic', async () => {
   const env = environment();
