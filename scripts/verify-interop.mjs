@@ -4,6 +4,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import Ajv from 'ajv';
 import formats from 'ajv-formats';
@@ -15,6 +17,23 @@ const read = (root, path) => JSON.parse(readFileSync(resolve(root, path), 'utf8'
 const byName = Object.fromEntries(roots.map(root => [read(root, 'package.json').name, root]));
 assert.deepEqual(Object.keys(byName).sort(), ['anti-artex', 'mcp-security-evidence']);
 const antiRoot = byName['anti-artex'], metadataRoot = byName['mcp-security-evidence'];
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+function provenance(root, output) {
+  const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
+  const dirty = git('status', '--porcelain', '--untracked-files=normal') !== '';
+  if (process.env.CI === 'true') assert.equal(dirty, false, 'CI checkout must be clean');
+  return {
+    commit: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}'), working_tree_dirty: dirty,
+    service_version: read(root, 'package.json').version,
+    compiled_modules_sha256: Object.fromEntries(readdirSync(resolve(root, output), { withFileTypes: true })
+      .filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name).sort()
+      .map(file => [output + '/' + file, sha256(readFileSync(resolve(root, output, file)))]))
+  };
+}
+const checkouts = {
+  anti_artex: provenance(antiRoot, 'dist/src'),
+  mcp_security_evidence: provenance(metadataRoot, 'dist')
+};
 const load = (root, path) => import(pathToFileURL(resolve(root, path)).href);
 const anti = await load(antiRoot, 'dist/src/evidence-contract.js');
 const metadata = await load(metadataRoot, 'dist/evidence-contract.js');
@@ -105,7 +124,9 @@ try {
   for (const event of legacy) for (const contract of contracts) assert.equal(await contract.verifyEvidence(event), false);
   assert.equal(outbound, 0);
   console.log(JSON.stringify({
+    report_version: '1.0.0', checked_at: new Date().toISOString(), node_version: process.version, checkouts,
     contract: '2.0.0', artifacts_identical: artifacts.length,
+    contract_artifacts_sha256: Object.fromEntries(artifacts.map(path => [path, sha256(readFileSync(resolve(local, 'contracts', path)))])),
     before: { rows: ['Anti-ARTEX v1.0', 'MCP Security Evidence v1'], columns: ['Anti-ARTEX v1.0', 'MCP Security Evidence v1'], schema_acceptance: [[true, false], [false, true]] },
     after: { golden_events: goldens.length, regenerated_golden_events: generated.length, worker_events: { anti_artex: antiEvents.length, mcp_security_evidence: report.events.length }, both_schemas_and_verifiers_pass: true, tampering_and_legacy_rejected: true },
     outbound_requests: outbound, live_deployment_tested: false

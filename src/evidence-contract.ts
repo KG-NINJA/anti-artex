@@ -96,10 +96,23 @@ function validShape(v: unknown): v is SharedEvidence {
 }
 // A pure verifier: no importing, storage, callbacks, execution or network access.
 // Callers must still establish authorization/provenance; hashes are not signatures.
-export async function verifyEvidence(value: unknown): Promise<boolean> {
+export type VerificationResult = { valid: true; schema_version: typeof EVIDENCE_VERSION } | {
+  valid: false;
+  code: 'unsupported_version' | 'invalid_shape' | 'invalid_encoding' | 'event_id_mismatch' | 'content_hash_mismatch';
+};
+export async function verifyEvidenceDetailed(value: unknown): Promise<VerificationResult> {
   try {
-    if (!validShape(value)) return false;
+    if (object(value) && Object.hasOwn(value, 'schema_version') && value.schema_version !== EVIDENCE_VERSION)
+      return { valid: false, code: 'unsupported_version' };
+    if (!validShape(value)) return { valid: false, code: 'invalid_shape' };
+    canonical(value); // Reject invalid Unicode/JSON before reporting hash differences.
     const { content_hash, event_id, ...payload } = value;
-    return event_id === await digest(payload) && content_hash === 'sha256:' + await digest({ ...payload, event_id });
-  } catch { return false; }
+    if (event_id !== await digest(payload)) return { valid: false, code: 'event_id_mismatch' };
+    if (content_hash !== 'sha256:' + await digest({ ...payload, event_id })) return { valid: false, code: 'content_hash_mismatch' };
+    return { valid: true, schema_version: EVIDENCE_VERSION };
+  } catch { return { valid: false, code: 'invalid_encoding' }; }
+}
+// Backwards-compatible boolean API for already-parsed objects.
+export async function verifyEvidence(value: unknown): Promise<boolean> {
+  return (await verifyEvidenceDetailed(value)).valid;
 }

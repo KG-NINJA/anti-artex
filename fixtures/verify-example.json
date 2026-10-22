@@ -1,0 +1,24 @@
+{
+  "schema_version": "2.0.0",
+  "observed_at": "2026-10-21T00:00:00.000Z",
+  "source_type": "mcp_honeypot",
+  "assessment_id": "synthetic-assessment",
+  "finding_type": "possible_prompt_injection",
+  "severity": "medium",
+  "evidence": {
+    "indicators": [
+      "instruction_override"
+    ]
+  },
+  "confidence": {
+    "scale": "heuristic_score",
+    "value": 0.65
+  },
+  "limitations": [
+    "Synthetic tool surface; no payload execution.",
+    "Heuristic classification can be wrong; client identity and AI-agent attribution are unknown."
+  ],
+  "remediation": "Review minimized evidence in the protected interface; do not execute submitted content.",
+  "event_id": "54005c0c1ed4f333943698fa595920cc83259fb76e2eebea64871de79013c5df",
+  "content_hash": "sha256:46f3ac3a7176e6b236d69a3f2b904ef1829421cf296b2b492cb9ec1441152d7a"
+}

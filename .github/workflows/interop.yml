@@ -1,0 +1,54 @@
+name: Evidence interoperability
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: evidence-interop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  interoperability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - name: Check out this revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: current
+          persist-credentials: false
+      - name: Check out the reviewed peer baseline
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: KG-NINJA/mcp-security-evidence
+          ref: f4362cbc8b04ab96c7bcab210aadc4d1f3ad327f
+          path: peer
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            current/package-lock.json
+            peer/package-lock.json
+      - name: Install and build this revision
+        working-directory: current
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Install and build the peer baseline
+        working-directory: peer
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Verify both directions and record tested revisions
+        working-directory: current
+        run: node scripts/verify-interop.mjs ../peer > ../compatibility-report.json
+      - name: Preserve the successful compatibility report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-compatibility
+          path: compatibility-report.json
+          if-no-files-found: error
+          retention-days: 7
+
