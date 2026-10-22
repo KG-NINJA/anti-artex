@@ -51,4 +51,3 @@ jobs:
           path: compatibility-report.json
           if-no-files-found: error
           retention-days: 7
-
