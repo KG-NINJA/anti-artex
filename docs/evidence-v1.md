@@ -1,5 +1,7 @@
 # Proposed evidence compatibility contract v1
 
+**Historical, superseded proposal.** New output uses [common contract 2.0.0](../contracts/README.md). The original schema and synthetic legacy fixtures remain for historical validation; old versions/IDs/hashes are never silently rewritten. The implementation-time status below does not describe the current reconciliation. See [compatibility results](compatibility-results.md) for synthetic v2 checks and their production limitations.
+
 Status: **local proposal; partner compatibility unverified**. Partner `KG-NINJA/mcp-security-evidence` exposed no refs and `main/README.md` returned 404 during this task. No counterpart files were modified. This contract must be reconciled with its documented schema before integration. Deployments remain independent; exchange JSON artifacts only by an approved process, never a shared database.
 
 Required exact fields are specified by `evidence-v1.schema.json`. Version `1.0` is a string. UTC timestamps use ISO 8601 millisecond `Z` form. Source type is `mcp_honeypot`, meaning the observation surface, **not** actor attribution. Assessment ID groups observations from one request and contains no client identity. Finding values describe heuristic observations: possible injection, invalid authentication, anomalous sequence or malformed request. Confidence is a numeric score in [0,1], not a calibrated probability. Severity is `low` or `medium`; no autonomous incident declaration occurs.

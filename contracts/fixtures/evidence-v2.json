@@ -1,0 +1,141 @@
+[
+  {
+    "schema_version": "2.0.0",
+    "observed_at": "2026-10-21T00:00:00.000Z",
+    "source_type": "mcp_honeypot",
+    "assessment_id": "synthetic-assessment",
+    "finding_type": "possible_prompt_injection",
+    "severity": "medium",
+    "evidence": {
+      "indicators": [
+        "instruction_override"
+      ]
+    },
+    "confidence": {
+      "scale": "heuristic_score",
+      "value": 0.65
+    },
+    "limitations": [
+      "Synthetic tool surface; no payload execution.",
+      "Heuristic classification can be wrong; client identity and AI-agent attribution are unknown."
+    ],
+    "remediation": "Review minimized evidence in the protected interface; do not execute submitted content.",
+    "event_id": "54005c0c1ed4f333943698fa595920cc83259fb76e2eebea64871de79013c5df",
+    "content_hash": "sha256:46f3ac3a7176e6b236d69a3f2b904ef1829421cf296b2b492cb9ec1441152d7a"
+  },
+  {
+    "schema_version": "2.0.0",
+    "observed_at": "2026-10-21T00:00:00.000Z",
+    "source_type": "submitted_mcp_metadata",
+    "assessment_id": "synthetic-assessment",
+    "finding_type": "authentication_not_declared",
+    "severity": "high",
+    "evidence": {
+      "path": "/publicConfiguration/authentication",
+      "observation": "Submitted configuration declares no authentication."
+    },
+    "confidence": {
+      "scale": "ordinal",
+      "value": "medium"
+    },
+    "limitations": [
+      "Submitted metadata only; provenance and live server behavior are not verified.",
+      "Tool annotations are untrusted hints; no tools were invoked."
+    ],
+    "remediation": "Require authenticated access and enforce per-tool authorization.",
+    "event_id": "e06901589cc56b9bbff70719c5316e5e5c95d12cc4b7e0fab011c45b5b363fd9",
+    "content_hash": "sha256:8566aea823e19219da1392522d84f762aa3240434071e071add0275713cf9347"
+  },
+  {
+    "schema_version": "2.0.0",
+    "observed_at": "2026-10-21T00:00:00.000Z",
+    "source_type": "submitted_mcp_metadata",
+    "assessment_id": "synthetic-assessment",
+    "finding_type": "permissive_tool_schema",
+    "severity": "medium",
+    "evidence": {
+      "path": "/tools/0/inputSchema",
+      "observation": "Tool schema does not explicitly restrict inputs to a closed object."
+    },
+    "confidence": {
+      "scale": "ordinal",
+      "value": "medium"
+    },
+    "limitations": [
+      "Submitted metadata only; provenance and live server behavior are not verified.",
+      "Tool annotations are untrusted hints; no tools were invoked."
+    ],
+    "remediation": "Use an object schema with additionalProperties:false and validate inputs at runtime.",
+    "event_id": "cfbb5c33c10d99a654a373e6b10669bd181c374c8b64002b86a798fbee772260",
+    "content_hash": "sha256:d3fc5dbc1b121d17c0fa8cd14ebfae9029993ca275595c431000ada735b08f73"
+  },
+  {
+    "schema_version": "2.0.0",
+    "observed_at": "2026-10-21T00:00:00.000Z",
+    "source_type": "submitted_mcp_metadata",
+    "assessment_id": "synthetic-assessment",
+    "finding_type": "tool_effects_unconfirmed",
+    "severity": "info",
+    "evidence": {
+      "path": "/tools/1/annotations",
+      "observation": "Tool is not explicitly annotated read-only."
+    },
+    "confidence": {
+      "scale": "ordinal",
+      "value": "medium"
+    },
+    "limitations": [
+      "Submitted metadata only; provenance and live server behavior are not verified.",
+      "Tool annotations are untrusted hints; no tools were invoked."
+    ],
+    "remediation": "Document tool effects and require explicit authorization for state-changing operations.",
+    "event_id": "7f44a3e1de327c91ff81883b916cb956057cab2b56c6a0f769b45927e6f338e5",
+    "content_hash": "sha256:7aa429a9732f1201f1daa3a2a4a057105449d5c3a8e2ba5590d331b11b22a4b2"
+  },
+  {
+    "schema_version": "2.0.0",
+    "observed_at": "2026-10-21T00:00:00.000Z",
+    "source_type": "submitted_mcp_metadata",
+    "assessment_id": "synthetic-assessment",
+    "finding_type": "destructive_tool_advertised",
+    "severity": "medium",
+    "evidence": {
+      "path": "/tools/1/annotations/destructiveHint",
+      "observation": "Tool advertises destructive behavior."
+    },
+    "confidence": {
+      "scale": "ordinal",
+      "value": "medium"
+    },
+    "limitations": [
+      "Submitted metadata only; provenance and live server behavior are not verified.",
+      "Tool annotations are untrusted hints; no tools were invoked."
+    ],
+    "remediation": "Restrict access and require confirmation before invoking destructive tools.",
+    "event_id": "127e4a7918888fc9dd0d525c738653724a9d97a51a14cae7ca85eb716940906d",
+    "content_hash": "sha256:bd556fb6fb96544422c4208cb82ab450fe5b7642bec45b83e2cbf9f28eb88835"
+  },
+  {
+    "schema_version": "2.0.0",
+    "observed_at": "2026-10-21T00:00:00.000Z",
+    "source_type": "submitted_mcp_metadata",
+    "assessment_id": "synthetic-assessment",
+    "finding_type": "assessment_scope",
+    "severity": "info",
+    "evidence": {
+      "path": "/",
+      "observation": "2 tool schemas reviewed; zero target requests made."
+    },
+    "confidence": {
+      "scale": "ordinal",
+      "value": "medium"
+    },
+    "limitations": [
+      "Submitted metadata only; provenance and live server behavior are not verified.",
+      "Tool annotations are untrusted hints; no tools were invoked."
+    ],
+    "remediation": "Validate findings with the system owner; this report is not a compliance certification.",
+    "event_id": "7ae5f5fb892c407e6937c49dc2f70ef9fd0ea0ec6d32b3ba585f944e67843cae",
+    "content_hash": "sha256:8bb6c3c8db083de4daf7b31a72825be82ee47e3f3dec5a65b7f61e5959a689e4"
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "name": "unicode",
+    "value": {
+      "z": "日本語 🐕",
+      "a": "line\nquote\"\\",
+      "decomposed": "é",
+      "composed": "é"
+    },
+    "canonical": "{\"a\":\"line\\nquote\\\"\\\\\",\"composed\":\"é\",\"decomposed\":\"é\",\"z\":\"日本語 🐕\"}",
+    "sha256": "ab1ed02eca1423da48430d987e5fe1e9221b447d3700c64ee18bb0a0431bd8e0"
+  },
+  {
+    "name": "nested",
+    "value": {
+      "z": [
+        "b",
+        "a"
+      ],
+      "a": {
+        "z": 0.65,
+        "a": true
+      },
+      "null": null
+    },
+    "canonical": "{\"a\":{\"a\":true,\"z\":0.65},\"null\":null,\"z\":[\"b\",\"a\"]}",
+    "sha256": "a752be770e07e321d6b3e99ebd709f9b91713ff5315f216f41aca3a5a2b3d2c3"
+  },
+  {
+    "name": "numbers",
+    "value": [
+      0,
+      1e-07,
+      1.25,
+      0.9
+    ],
+    "canonical": "[0,1e-7,1.25,0.9]",
+    "sha256": "f34eaf572fe7ed36f99f499486ffa389233155d3cc8f80a17732630019bff438"
+  }
+]
