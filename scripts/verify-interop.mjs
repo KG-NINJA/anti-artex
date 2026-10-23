@@ -1,6 +1,6 @@
 // Offline cross-check of two already-installed/built checkouts. Never clones or deploys.
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -38,6 +38,19 @@ const load = (root, path) => import(pathToFileURL(resolve(root, path)).href);
 const anti = await load(antiRoot, 'dist/src/evidence-contract.js');
 const metadata = await load(metadataRoot, 'dist/evidence-contract.js');
 const contracts = [anti, metadata];
+// The pinned v0.2 peer predates the raw verifier. Record that gap explicitly;
+// if its source exists, require the build to exist and load successfully.
+const rawVerifiers = [];
+for (const [name, root] of Object.entries(byName)) {
+  if (!existsSync(resolve(root, 'src/evidence-json.ts'))) {
+    assert.equal(read(root, 'package.json').version, '0.2.0', 'Only the legacy v0.2 baseline may lack a raw verifier');
+    continue;
+  }
+  const output = name === 'anti-artex' ? 'dist/src' : 'dist';
+  const { verifyEvidenceJson } = await load(root, output + '/evidence-json.js');
+  rawVerifiers.push({ name, verify: verifyEvidenceJson, accepted: 0, rejected: 0 });
+}
+assert.ok(rawVerifiers.some(v => v.name === read(local, 'package.json').name), 'Current raw verifier must be tested');
 const schemas = roots.map(root => {
   const ajv = new Ajv2020({ allErrors: true }); formats(ajv);
   return ajv.compile(read(root, 'contracts/evidence-v2.schema.json'));
@@ -57,6 +70,17 @@ async function crossVerify(events) {
     for (const contract of contracts) {
       assert.equal(await contract.verifyEvidence(event), true);
       assert.equal(await contract.verifyEvidence({ ...event, remediation: 'tampered' }), false);
+    }
+    const text = JSON.stringify(event);
+    const duplicate = '{"\\u0073chema_version":"untrusted",' + text.slice(1);
+    for (const raw of rawVerifiers) {
+      for (const input of [text, new TextEncoder().encode(text)]) {
+        assert.deepEqual(await raw.verify(input), { valid: true, schema_version: '2.0.0' });
+        raw.accepted++;
+      }
+      assert.deepEqual(await raw.verify(JSON.stringify({ ...event, remediation: 'tampered' })), { valid: false, code: 'event_id_mismatch' });
+      assert.deepEqual(await raw.verify(duplicate), { valid: false, code: 'duplicate_key' });
+      raw.rejected += 2;
     }
   }
 }
@@ -121,14 +145,22 @@ try {
   const report = await response.json();
   assert.equal(report.schema_version, '2.0.0'); assert.equal(report.target_requests, 0); assert.equal(report.events.length, 5);
   await crossVerify([...antiEvents, ...report.events]);
-  for (const event of legacy) for (const contract of contracts) assert.equal(await contract.verifyEvidence(event), false);
+  for (const event of legacy) {
+    for (const contract of contracts) assert.equal(await contract.verifyEvidence(event), false);
+    for (const raw of rawVerifiers) {
+      assert.deepEqual(await raw.verify(JSON.stringify(event)), { valid: false, code: 'unsupported_version' });
+      raw.rejected++;
+    }
+  }
   assert.equal(outbound, 0);
   console.log(JSON.stringify({
-    report_version: '1.0.0', checked_at: new Date().toISOString(), node_version: process.version, checkouts,
+    report_version: '1.1.0', checked_at: new Date().toISOString(), node_version: process.version, checkouts,
     contract: '2.0.0', artifacts_identical: artifacts.length,
     contract_artifacts_sha256: Object.fromEntries(artifacts.map(path => [path, sha256(readFileSync(resolve(local, 'contracts', path)))])),
     before: { rows: ['Anti-ARTEX v1.0', 'MCP Security Evidence v1'], columns: ['Anti-ARTEX v1.0', 'MCP Security Evidence v1'], schema_acceptance: [[true, false], [false, true]] },
     after: { golden_events: goldens.length, regenerated_golden_events: generated.length, worker_events: { anti_artex: antiEvents.length, mcp_security_evidence: report.events.length }, both_schemas_and_verifiers_pass: true, tampering_and_legacy_rejected: true },
+    raw_json_verification: Object.fromEntries(rawVerifiers.map(({ name, accepted, rejected }) => [name, { accepted, rejected }])),
+    raw_json_unavailable: Object.keys(byName).filter(name => !rawVerifiers.some(v => v.name === name)),
     outbound_requests: outbound, live_deployment_tested: false
   }, null, 2));
 } finally { db.db.close(); globalThis.fetch = oldFetch; }

@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const read = path => JSON.parse(readFileSync(new URL('../' + path, import.meta.url), 'utf8'));
 const anti = read('package.json').name === 'anti-artex';
 const output = anti ? '../dist/src/' : '../dist/';
-const { verifyEvidence, verifyEvidenceDetailed, sealEvidence } = await import(output + 'evidence-contract.js');
+const { canonical, verifyEvidence, verifyEvidenceDetailed, sealEvidence } = await import(output + 'evidence-contract.js');
 const { verifyEvidenceJson, MAX_EVIDENCE_BYTES, MAX_JSON_DEPTH } = await import(output + 'evidence-json.js');
 const goldens = read('contracts/fixtures/evidence-v2.json');
 const ok = { valid: true, schema_version: '2.0.0' };
@@ -119,6 +120,66 @@ test('offline CLI supports a file or stdin and emits machine-readable results an
       const result = cli(args);
       assert.equal(result.status, 2); assert.deepEqual(JSON.parse(result.stdout), fail(code));
       assert.doesNotMatch(result.stdout + result.stderr, /missing-secret-file/);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+const escapedKey = key => '"' + key.split('').map(c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')).join('') + '"';
+test('duplicate detection decodes punctuation, control characters and surrogate pairs in nested array objects', async () => {
+  for (const key of ['', '/', '"', '\\', '\n', '🐕', '__proto__', 'constructor', 'private-field-marker']) {
+    const text = '{"outer":[{' + JSON.stringify(key) + ':1,' + escapedKey(key) + ':2}]}';
+    assert.deepEqual(await verifyEvidenceJson(text), fail('duplicate_key'));
+    assert.deepEqual(await verifyEvidenceJson(Buffer.from(text)), fail('duplicate_key'));
+  }
+  assert.deepEqual(await verifyEvidenceJson('{"/":1,"\\/":2}'), fail('duplicate_key'));
+  // Canonically equivalent Unicode is not normalized into the same member name.
+  assert.deepEqual(await verifyEvidenceJson('{"é":1,"e\\u0301":2}'), fail('invalid_shape'));
+});
+
+test('every envelope member rejects an escaped duplicate in either order even when values and hashes agree', async () => {
+  for (const event of goldens) {
+    const original = JSON.stringify(event);
+    for (const [key, value] of Object.entries(event)) {
+      const member = escapedKey(key) + ':' + JSON.stringify(value);
+      for (const text of ['{' + member + ',' + original.slice(1), original.slice(0, -1) + ',' + member + '}']) {
+        assert.deepEqual(JSON.parse(text), event);
+        assert.deepEqual(await verifyEvidenceJson(text), fail('duplicate_key'));
+      }
+    }
+  }
+});
+
+test('raw verification rejects forged event IDs even after the content hash is recomputed', async () => {
+  for (const event of goldens) {
+    const body = { ...event, event_id: '0'.repeat(64) }; delete body.content_hash;
+    const content_hash = 'sha256:' + createHash('sha256').update(canonical(body), 'utf8').digest('hex');
+    const text = JSON.stringify({ ...body, content_hash });
+    assert.deepEqual(await verifyEvidenceJson(text), fail('event_id_mismatch'));
+    assert.deepEqual(await verifyEvidenceJson(Buffer.from(text)), fail('event_id_mismatch'));
+  }
+});
+
+test('CLI keeps malformed bytes and confidential file paths out of stdout and stderr at byte boundaries', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'evidence-cli-'));
+  const path = join(dir, 'confidential-path-marker.json');
+  try {
+    const padded = Buffer.from(json + ' '.repeat(MAX_EVIDENCE_BYTES - Buffer.byteLength(json)));
+    const cases = [
+      [padded, ok, 0], [Buffer.concat([padded, Buffer.from(' ')]), fail('input_too_large'), 1],
+      [Buffer.from([0xff]), fail('invalid_utf8'), 1],
+      [Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(json)]), fail('invalid_json'), 1],
+      [Buffer.from('{"confidential-value-marker": malformed}'), fail('invalid_json'), 1],
+      [Buffer.from('{"confidential-key-marker":1,"confidential-key-marker":2}'), fail('duplicate_key'), 1]
+    ];
+    for (const [bytes, expected, exit] of cases) {
+      writeFileSync(path, bytes);
+      for (const [args, input] of [[[path], undefined], [['-'], bytes]]) {
+        const result = cli(args, input);
+        assert.equal(result.status, exit, result.stderr);
+        assert.deepEqual(JSON.parse(result.stdout), expected);
+        assert.equal(result.stderr, '');
+        assert.doesNotMatch(result.stdout + result.stderr, /confidential-(?:path|value|key)-marker/);
+      }
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
