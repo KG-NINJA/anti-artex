@@ -60,6 +60,12 @@ This is a breaking API change in service 0.2.0. [Legacy v1.0](docs/evidence-v1.m
 
 Expiry is enforced on every read. MCP traffic and an hourly scheduled handler physically remove expired events/sessions and old budget rows. Thus stored rows can remain until the next successful cleanup, normally up to an hour beyond expiry; provider outages/backups may extend physical retention. Changing retention only affects new events. Cleanup failures surface as 503 or failed scheduled executions, never success claims.
 
+## Verify JSON and prevent compatibility drift
+
+Service 0.3.0 adds a bounded, offline verifier while keeping evidence contract 2.0.0 unchanged. Run `npm run --silent verify:evidence -- fixtures/verify-example.json` (or pass an event file / `-` for stdin). It rejects duplicate keys, invalid UTF-8/JSON, oversized or deeply nested inputs, unsupported versions and integrity failures using fixed error codes, without echoing input data. No verification endpoint, import or automatic response action is enabled.
+
+The separate **Evidence interoperability** GitHub Actions job tests each change against a pinned reviewed peer commit, then saves a JSON report identifying the actual revisions, compiled modules, contract hashes and results. Existing per-service CI and runtime independence remain intact. See the [verification guide](docs/verification-guide.md) for limits, API/CLI usage, exit codes, peer pins and artifact retention.
+
 ## Validation and limits
 
 `npm test` runs real SQLite schema/queries through a minimal D1 adapter, synthetic fixtures from both producers, deterministic schema/hash validation, auth/limits/session/privacy checks, and legacy rejection/preservation. `npm run smoke:local` tests the actual local Worker + D1 runtime. Neither demonstrates deployed Cloudflare behavior. See [threat model](docs/threat-model.md) and [manual operations, rollback and budget](docs/operations.md). No deployment is authorized by these commands.
