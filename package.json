@@ -15,7 +15,9 @@
     "test:interop": "node scripts/verify-interop.mjs",
     "verify:evidence": "npm run build --silent && node scripts/verify-evidence.mjs",
     "lab:validate": "npm run build && node scripts/validation-lab.mjs",
-    "benchmark:triage": "npm run build && node scripts/prompt-triage-benchmark.mjs"
+    "benchmark:triage": "npm run build && node scripts/prompt-triage-benchmark.mjs",
+    "portfolio:complete": "npm test && node scripts/practitioner-complete.mjs && node scripts/portfolio-bundle.mjs verify",
+    "portfolio:verify": "node scripts/portfolio-bundle.mjs verify"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
