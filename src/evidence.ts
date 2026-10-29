@@ -12,6 +12,19 @@ export function indicators(text: string): string[] {
   ];
   return rules.filter(([, re]) => re.test(text)).map(([name]) => name).sort();
 }
+// Treat protocol fields, tool names and client metadata as data, not prompts.
+// The heuristic operates only on the simulated tool's free-text query.
+export function indicatorsForRpc(rpc: unknown): string[] {
+  if (rpc === null || typeof rpc !== 'object' || Array.isArray(rpc)) return [];
+  const message = rpc as Record<string, unknown>;
+  if (message.method !== 'tools/call') return [];
+  const params = message.params;
+  if (params === null || typeof params !== 'object' || Array.isArray(params)) return [];
+  const argumentsValue = (params as Record<string, unknown>).arguments;
+  if (argumentsValue === null || typeof argumentsValue !== 'object' || Array.isArray(argumentsValue)) return [];
+  const query = (argumentsValue as Record<string, unknown>).query;
+  return typeof query === 'string' ? indicators(query) : [];
+}
 // Optional previews are always redacted BEFORE truncation; default is no preview.
 export function redact(text: string, limit: number): string {
   const redacted = text.replace(/https?:\/\/[^\s"<>]+/gi, '[URL]')
