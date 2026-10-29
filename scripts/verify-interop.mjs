@@ -130,7 +130,10 @@ try {
   const eventResponse = await antiWorker.fetch(new Request('https://research.invalid/investigation/events', { headers: { authorization: 'Bearer ' + token } }), env);
   assert.equal(eventResponse.status, 200);
   const antiEvents = (await eventResponse.json()).events;
-  assert.equal(antiEvents.length, 3);
+  // Tool discovery params are protocol data, not a tool-query prompt.
+  // Only invalid auth and a pre-initialize request are recorded here.
+  assert.equal(antiEvents.length, 2);
+  assert.deepEqual(antiEvents.map(e => e.finding_type).sort(), ['anomalous_sequence', 'invalid_authentication']);
   assert.ok(antiEvents.every(e => e.evidence.preview === undefined));
 
   const metadataWorker = (await load(metadataRoot, 'dist/index.js')).default;
