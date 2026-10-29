@@ -151,7 +151,11 @@ const worker = {
       if (!accept.includes('application/json') || !accept.includes('text/event-stream')) return json({ error: 'Accept must include application/json and text/event-stream' }, 406);
       if (!(request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase().match(/^application\/json$/)) return json({ error: 'JSON required' }, 415);
       let text: string | null;
-      try { text = await readBody(request, c.body); } catch { await record('malformed_request', ['invalid_body_encoding']); return json({ error: 'Invalid body' }, 400); }
+      try { text = await readBody(request, c.body); } catch (err) {
+        const flag = err instanceof Error && err.message === 'Body read deadline exceeded' ? 'body_read_deadline_exceeded' : 'invalid_body_encoding';
+        await record('malformed_request', [flag]);
+        return json({ error: 'Invalid body' }, 400);
+      }
       if (text === null) { await record('malformed_request', ['body_limit_exceeded']); return json({ error: 'Body too large' }, 413); }
       let rpc: unknown;
       try { rpc = JSON.parse(text); } catch { await record('malformed_request', ['invalid_json']); return json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, 400); }
