@@ -14,7 +14,8 @@
     "smoke:local": "node test/local-smoke.mjs",
     "test:interop": "node scripts/verify-interop.mjs",
     "verify:evidence": "npm run build --silent && node scripts/verify-evidence.mjs",
-    "lab:validate": "npm run build && node scripts/validation-lab.mjs"
+    "lab:validate": "npm run build && node scripts/validation-lab.mjs",
+    "benchmark:triage": "npm run build && node scripts/prompt-triage-benchmark.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
