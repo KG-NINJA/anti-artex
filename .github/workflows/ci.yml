@@ -24,3 +24,15 @@ jobs:
       - run: npm run lab:validate
       - run: npm run benchmark:triage
       - run: npm run bundle
+
+      - name: Preserve sanitized synthetic portfolio reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: synthetic-security-portfolio
+          path: |
+            artifacts/lab/summary.json
+            artifacts/lab/summary.md
+            artifacts/triage/report.json
+            artifacts/triage/report.md
+          if-no-files-found: error
+          retention-days: 7
