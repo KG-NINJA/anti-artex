@@ -1,4 +1,4 @@
-import { hash, indicators, makeEvidence, redact, type Finding } from './evidence.js';
+import { hash, indicatorsForRpc, makeEvidence, redact, type Finding } from './evidence.js';
 
 export interface Statement {
   bind(...args: unknown[]): Statement;
@@ -44,22 +44,42 @@ async function authorized(request: Request, token?: string): Promise<boolean> {
   return different === 0;
 }
 async function readBody(request: Request, max: number): Promise<string | null> {
-  if (Number(request.headers.get('content-length')) > max) return null;
+  // A bounded body reader: slow and unbounded streams must not exhaust a Worker.
+  if (request.headers.has('content-encoding')) throw new Error('Encoded bodies unsupported');
+  const declared = request.headers.get('content-length');
+  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > max)) return null;
   if (!request.body) return '';
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > max) { await reader.cancel(); return null; }
-    chunks.push(value);
+  let expired = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      // cancel() can resolve a pending read with done:true. Reject first and
+      // retain an explicit flag so a valid JSON prefix cannot bypass timeout.
+      expired = true;
+      reject(new Error('Body read deadline exceeded'));
+      void reader.cancel().catch(() => undefined);
+    }, 2000);
+  });
+  try {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (expired) throw new Error('Body read deadline exceeded');
+      if (done) break;
+      size += value.byteLength;
+      if (size > max) { void reader.cancel().catch(() => undefined); return null; }
+      chunks.push(value);
+    }
+    const all = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
+    return new TextDecoder('utf-8', { fatal: true }).decode(all);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    reader.releaseLock();
   }
-  const all = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
-  return new TextDecoder('utf-8', { fatal: true }).decode(all);
 }
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -136,7 +156,11 @@ const worker = {
       if (!accept.includes('application/json') || !accept.includes('text/event-stream')) return json({ error: 'Accept must include application/json and text/event-stream' }, 406);
       if (!(request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase().match(/^application\/json$/)) return json({ error: 'JSON required' }, 415);
       let text: string | null;
-      try { text = await readBody(request, c.body); } catch { await record('malformed_request', ['invalid_body_encoding']); return json({ error: 'Invalid body' }, 400); }
+      try { text = await readBody(request, c.body); } catch (err) {
+        const flag = err instanceof Error && err.message === 'Body read deadline exceeded' ? 'body_read_deadline_exceeded' : 'invalid_body_encoding';
+        await record('malformed_request', [flag]);
+        return json({ error: 'Invalid body' }, 400);
+      }
       if (text === null) { await record('malformed_request', ['body_limit_exceeded']); return json({ error: 'Body too large' }, 413); }
       let rpc: unknown;
       try { rpc = JSON.parse(text); } catch { await record('malformed_request', ['invalid_json']); return json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, 400); }
@@ -144,7 +168,8 @@ const worker = {
         await record('malformed_request', ['invalid_json_rpc']);
         return json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } }, 400);
       }
-      const flags = indicators(text);
+      // Classify only the user-supplied tool query, not protocol or client metadata.
+      const flags = indicatorsForRpc(rpc);
       if (flags.length) await record('possible_prompt_injection', flags, text);
       const notification = rpc.id === undefined;
       const result = (value: unknown, headers: Record<string, string> = {}) => notification ? new Response(null, { status: 202 }) : json({ jsonrpc: '2.0', id: rpc.id, result: value }, 200, headers);

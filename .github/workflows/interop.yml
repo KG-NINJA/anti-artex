@@ -9,6 +9,14 @@ jobs:
   interoperability:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: legacy-v02
+            peer_ref: f4362cbc8b04ab96c7bcab210aadc4d1f3ad327f
+          - label: reviewed-pr5
+            peer_ref: cea8b6615f4a53a21280e50ddf1554b503a39338
     env:
       WRANGLER_SEND_METRICS: 'false'
     steps:
@@ -17,11 +25,11 @@ jobs:
         with:
           path: current
           persist-credentials: false
-      - name: Check out the reviewed peer baseline
+      - name: Check out the reviewed peer revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: KG-NINJA/mcp-security-evidence
-          ref: f4362cbc8b04ab96c7bcab210aadc4d1f3ad327f
+          ref: ${{ matrix.peer_ref }}
           path: peer
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -36,7 +44,7 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm run build
-      - name: Install and build the peer baseline
+      - name: Install and build the peer revision
         working-directory: peer
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
@@ -47,7 +55,7 @@ jobs:
       - name: Preserve the successful compatibility report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: evidence-compatibility
+          name: evidence-compatibility-${{ matrix.label }}
           path: compatibility-report.json
           if-no-files-found: error
           retention-days: 7

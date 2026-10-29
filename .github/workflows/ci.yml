@@ -21,4 +21,5 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run lint
       - run: npm test
+      - run: npm run lab:validate
       - run: npm run bundle
