@@ -52,16 +52,21 @@ async function readBody(request: Request, max: number): Promise<string | null> {
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
+  let expired = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      void reader.cancel().catch(() => undefined);
+      // cancel() can resolve a pending read with done:true. Reject first and
+      // retain an explicit flag so a valid JSON prefix cannot bypass timeout.
+      expired = true;
       reject(new Error('Body read deadline exceeded'));
+      void reader.cancel().catch(() => undefined);
     }, 2000);
   });
   try {
     for (;;) {
       const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (expired) throw new Error('Body read deadline exceeded');
       if (done) break;
       size += value.byteLength;
       if (size > max) { void reader.cancel().catch(() => undefined); return null; }
