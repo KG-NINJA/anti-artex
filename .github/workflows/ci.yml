@@ -22,4 +22,5 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run lab:validate
+      - run: npm run benchmark:triage
       - run: npm run bundle
