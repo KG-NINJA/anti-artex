@@ -2,7 +2,7 @@
 // Hash verification is NOT signature verification, customer authorization or safety certification.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, lstatSync, readdirSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, lstatSync, readdirSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -15,6 +15,10 @@ const regular = path => {
   const s = lstatSync(path);
   assert.ok(s.isFile() && !s.isSymbolicLink() && s.nlink === 1, 'Expected unlinked regular file');
   assert.ok(s.size <= MAX_BYTES, 'Artifact exceeds limit'); return s;
+};
+const outputPath = path => {
+  // lstat sees dangling symlinks too; only an absent entry is safe to create.
+  if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) regular(path);
 };
 export function provenance(root = resolve('.')) {
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: MAX_BYTES }).trim();
@@ -48,13 +52,23 @@ export function writeBundle(report, directory = resolve('artifacts/practitioner'
   assert.ok(readdirSync(directory).every(n => [...NAMES, 'manifest.json'].includes(n)), 'Unexpected files in artifact directory');
   const files = { 'results.json': serialized, 'report.md': text, 'index.html': html }, entries = {};
   for (const [name, data] of Object.entries(files)) {
-    assert.ok(Buffer.byteLength(data) <= MAX_BYTES); const path = join(directory, name);
-    if (existsSync(path)) regular(path);
-    writeFileSync(path, data, { flag: 'w', mode: 0o600 }); entries[name] = { bytes: Buffer.byteLength(data), sha256: sha256(data) };
+    assert.ok(Buffer.byteLength(data) <= MAX_BYTES);
+    entries[name] = { bytes: Buffer.byteLength(data), sha256: sha256(data) };
   }
   const manifest = { schema_version: 'synthetic-portfolio-bundle/1.0', authenticity_verified: false, files: entries };
-  const path = join(directory, 'manifest.json'); if (existsSync(path)) regular(path);
-  writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+  files['manifest.json'] = JSON.stringify(manifest, null, 2) + '\n';
+  // Validate every destination before changing any existing report or manifest.
+  for (const name of Object.keys(files)) outputPath(join(directory, name));
+  const staging = mkdtempSync(join(directory, '.bundle-'));
+  try {
+    for (const [name, data] of Object.entries(files)) {
+      writeFileSync(join(staging, name), data, { flag: 'wx', mode: 0o600 });
+    }
+    for (const name of Object.keys(files)) outputPath(join(directory, name));
+    // Renaming a fresh file never opens/follows the destination link target.
+    // The caller must own the directory; concurrent directory replacement is unsupported.
+    for (const name of Object.keys(files)) renameSync(join(staging, name), join(directory, name));
+  } finally { rmSync(staging, { recursive: true, force: true }); }
   return verifyBundle(directory);
 }
 export function verifyBundle(directory = resolve('artifacts/practitioner')) {
