@@ -13,7 +13,8 @@
     "bundle": "wrangler deploy --dry-run --outdir dist/worker",
     "smoke:local": "node test/local-smoke.mjs",
     "test:interop": "node scripts/verify-interop.mjs",
-    "verify:evidence": "npm run build --silent && node scripts/verify-evidence.mjs"
+    "verify:evidence": "npm run build --silent && node scripts/verify-evidence.mjs",
+    "lab:validate": "npm run build && node scripts/validation-lab.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
